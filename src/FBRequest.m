@@ -15,7 +15,19 @@
  */
 
 #import "FBRequest.h"
+
+// Conditional compilation for SBJSON and/or NSJSONSerialization.
+// If the app supports OS versions prior to NSJSONSerialization, we'll do a runtime
+// test for it and use it if present, otherwise fall back to SBJSON.
+#ifdef __IPHONE_OS_VERSION_MIN_REQUIRED
+#define USE_SBJSON (__IPHONE_OS_VERSION_MIN_REQUIRED < 50000)
+#else
+#define USE_SBJSON (MAC_OS_X_VERSION_MIN_REQUIRED < 1070)
+#endif
+
+#if USE_SBJSON
 #import "JSON.h"
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // global
@@ -26,6 +38,18 @@ static const int kGeneralErrorCode = 10000;
 static const int kRESTAPIAccessTokenErrorCode = 190;
 
 static const NSTimeInterval kTimeoutInterval = 180.0;
+
+#if TARGET_OS_IPHONE
+#import <UIKit/UIKit.h>
+#else
+#import <AppKit/AppKit.h>
+#define UIImage NSImage
+static NSData* UIImagePNGRepresentation(NSImage* image) {
+    NSBitmapImageRep* rep = [[image representations] objectAtIndex: 0];
+    NSCAssert([rep isKindOfClass: [NSBitmapImageRep class]], @"Invalid image rep");
+    return [rep representationUsingType:NSPNGFileType properties:nil];
+}
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -201,10 +225,13 @@ static const NSTimeInterval kTimeoutInterval = 180.0;
         return nil;
     }
     
-    
+#if USE_SBJSON
     SBJSON *jsonParser = [[SBJSON alloc] init];
     id result = [jsonParser objectWithString:responseString];
     [jsonParser release];
+#else
+    id result = [NSJSONSerialization JSONObjectWithData: data options:0 error:nil];
+#endif
 
     if (result == nil) {
         return responseString;

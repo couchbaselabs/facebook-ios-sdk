@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-#import "FBLoginDialog.h"
 #import "FBRequest.h"
 #import "FBFrictionlessRequestSettings.h"
-
-@protocol FBSessionDelegate;
+@class FBDialog;
+@protocol FBSessionDelegate, FBDialogDelegate;
 
 /**
  * Main Facebook interface for interacting with the Facebook developer API.
@@ -26,7 +25,7 @@
  * and Graph APIs, and start user interface interactions (such as
  * pop-ups promoting for credentials, permissions, stream posts, etc.)
  */
-@interface Facebook : NSObject<FBLoginDialogDelegate,FBRequestDelegate>{
+@interface Facebook : NSObject {
     NSString* _accessToken;
     NSDate* _expirationDate;
     id<FBSessionDelegate> _sessionDelegate;
@@ -89,12 +88,14 @@
                      andHttpMethod:(NSString *)httpMethod
                        andDelegate:(id <FBRequestDelegate>)delegate;
 
+#if TARGET_OS_IPHONE
 - (void)dialog:(NSString *)action
    andDelegate:(id<FBDialogDelegate>)delegate;
 
 - (void)dialog:(NSString *)action
      andParams:(NSMutableDictionary *)params
    andDelegate:(id <FBDialogDelegate>)delegate;
+#endif
 
 - (BOOL)isSessionValid;
 

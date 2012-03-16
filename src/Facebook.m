@@ -15,9 +15,14 @@
  */
 
 #import "Facebook.h"
-#import "FBLoginDialog.h"
 #import "FBRequest.h"
 #import "JSON.h"
+
+#if TARGET_OS_IPHONE
+#import "FBLoginDialog.h"
+#else
+#import <AppKit/AppKit.h>
+#endif
 
 static NSString* kDialogBaseURL = @"https://m.facebook.com/dialog/";
 static NSString* kGraphBaseURL = @"https://graph.facebook.com/";
@@ -41,7 +46,11 @@ static void *finishedContext = @"finishedContext";
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-@interface Facebook ()
+@interface Facebook () <FBRequestDelegate
+#if TARGET_OS_IPHONE
+                       ,FBLoginDialogDelegate
+#endif
+                                             >
 
 // private properties
 @property(nonatomic, retain) NSArray* permissions;
@@ -211,6 +220,15 @@ static void *finishedContext = @"finishedContext";
             _urlSchemeSuffix ? _urlSchemeSuffix : @""];
 }
 
+- (BOOL) openURL: (NSString*)urlStr {
+    NSURL* url = [NSURL URLWithString:urlStr];
+#if TARGET_OS_IPHONE
+    return [[UIApplication sharedApplication] openURL:url];
+#else
+    return [[NSWorkspace sharedWorkspace] openURL:url];
+#endif
+}
+
 /**
  * A private function for opening the authorization dialog.
  */
@@ -235,6 +253,8 @@ static void *finishedContext = @"finishedContext";
         [params setValue:_urlSchemeSuffix forKey:@"local_client_id"];
     }
     
+    BOOL didOpenOtherApp = NO;
+#if TARGET_OS_IPHONE
     // If the device is running a version of iOS that supports multitasking,
     // try to obtain the access token from the Facebook app installed
     // on the device.
@@ -242,9 +262,9 @@ static void *finishedContext = @"finishedContext";
     // the fbauth:// URL scheme, fall back on Safari for obtaining the access token.
     // This minimizes the chance that the user will have to enter his or
     // her credentials in order to authorize the application.
-    BOOL didOpenOtherApp = NO;
     UIDevice *device = [UIDevice currentDevice];
     if ([device respondsToSelector:@selector(isMultitaskingSupported)] && [device isMultitaskingSupported]) {
+#endif
         if (tryFBAppAuth) {
             NSString *scheme = kFBAppAuthURLScheme;
             if (_urlSchemeSuffix) {
@@ -252,7 +272,7 @@ static void *finishedContext = @"finishedContext";
             }
             NSString *urlPrefix = [NSString stringWithFormat:@"%@://%@", scheme, kFBAppAuthURLPath];
             NSString *fbAppUrl = [FBRequest serializeURL:urlPrefix params:params];
-            didOpenOtherApp = [[UIApplication sharedApplication] openURL:[NSURL URLWithString:fbAppUrl]];
+            didOpenOtherApp = [self openURL:fbAppUrl];
         }
         
         if (trySafariAuth && !didOpenOtherApp) {
@@ -260,8 +280,9 @@ static void *finishedContext = @"finishedContext";
             [params setValue:nextUrl forKey:@"redirect_uri"];
             
             NSString *fbAppUrl = [FBRequest serializeURL:loginDialogURL params:params];
-            didOpenOtherApp = [[UIApplication sharedApplication] openURL:[NSURL URLWithString:fbAppUrl]];
+            didOpenOtherApp = [self openURL:fbAppUrl];
         }
+#if TARGET_OS_IPHONE
     }
     
     // If single sign-on failed, open an inline login dialog. This will require the user to
@@ -273,6 +294,7 @@ static void *finishedContext = @"finishedContext";
                                                  delegate:self];
         [_loginDialog show];
     }
+#endif
 }
 
 /**
@@ -655,6 +677,8 @@ static void *finishedContext = @"finishedContext";
                 delegate:delegate];
 }
 
+#if TARGET_OS_IPHONE
+
 /**
  * Generate a UI dialog for the request action.
  *
@@ -742,6 +766,8 @@ static void *finishedContext = @"finishedContext";
     
     [_fbDialog show];
 }
+
+#endif // TARGET_OS_IPHONE
 
 - (BOOL)isFrictionlessRequestsEnabled {
     return _frictionlessRequestSettings.enabled;
